@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: db-notifications-service
+  name: newsapp-service
 spec:
   type: NodePort
   ports:
@@ -10,18 +10,18 @@ spec:
       protocol: TCP
       name: http
   selector:
-    app: db-notifications-pub
+    app: newsapp-pub
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: db-notifications-deployment
+  name: newsapp-deployment
 spec:
   replicas: 1
   template:
     metadata:
       labels:
-        app: db-notifications-pub
+        app: newsapp-notifications-pub
     spec:
       volumes:
       - name: notifications-pub-sa-key
@@ -33,12 +33,11 @@ spec:
           args: [
             "--http_port=8081",
             "--backend=127.0.0.1:8080",
-            "--service=db-notifications.endpoints.gcp-dsw-db-notifications-{{env}}.cloud.goog",
+            "--service=newsapp.endpoints.gcp-newsapp-notifications-{{env}}.cloud.goog",
             "--rollout_strategy=managed"
           ]
         - name: notifications-pub-container
-          #image: us.gcr.io/gcp-dsw-images/gke/db-notifications-pub:{{tag}}
-          image: us.gcr.io/gcp-dsw-notifications-{{env}}/gke/db-notifications-pub:{{tag}}
+          image: us.gcr.io/gcp-newsapp-notifications-{{env}}/gke/newsapp-notifications-pub:{{tag}}
           readinessProbe:
             httpGet:
               path: /
@@ -52,23 +51,23 @@ spec:
               memory: 1.1Gi
           env:
           - name: LOGGING_FILE
-            value: "db-notifications-pub-container"
+            value: "newsapp-pub-container"
           - name: GIT_HASH
             value: "{{tag}}"
           - name: GOOGLE_PROJECT_ID
             valueFrom:
               configMapKeyRef:
-                name: db-notifications
+                name: newsapp-notifications
                 key: google-project-id
           - name: PUBSUB_PROJECT_ID
             valueFrom:
               configMapKeyRef:
-                name: db-notifications
+                name: newsapp-notifications
                 key: pubsub-project-id
           - name: SPRING_PROFILES_ACTIVE
             valueFrom:
               configMapKeyRef:
-                name: db-notifications
+                name: newsapp-notifications
                 key: spring-profiles-active
           - name: GOOGLE_APPLICATION_CREDENTIALS
             value: /var/secrets/google/notifications-credentials.json
@@ -87,34 +86,13 @@ metadata:
 spec:
   tls:
   - hosts:
-    - "db-notifications.endpoints.gcp-dsw-db-notifications-{{env}}.cloud.goog"
-    secretName: db-notifications-pub-tls
+    - "newsapp-notifications.endpoints.gcp-newsapp-notifications-{{env}}.cloud.goog"
+    secretName: newsapp-notifications-pub-tls
   rules:
-  - host: "db-notifications.endpoints.gcp-dsw-db-notifications-{{env}}.cloud.goog"
+  - host: "newsapp-notifications.endpoints.gcp-newsapp-notifications-{{env}}.cloud.goog"
     http:
       paths:
       - path: /*
         backend:
-          serviceName: db-notifications-service
+          serviceName: newsapp-notifications-service
           servicePort: 80
----
-#apiVersion: certmanager.k8s.io/v1alpha1
-#kind: Certificate
-#metadata:
-#  name: notifications-pub-tls
-#  namespace: default
-#spec:
-#  secretName: notifications-pub-tls
-#  issuerRef:
-#    name: letsencrypt-prod
-#    kind: ClusterIssuer
-#  commonName: "notifications.endpoints.gcp-dsw-db-notifications-{{env}}.cloud.goog"
-#  dnsNames:
-#  - "notifications.endpoints.gcp-dsw-db-notifications-{{env}}.cloud.goog"
-#  acme:
-#    config:
-#    - http01:
-#        ingress: notifications-ingress
-#      domains:
-#      - "notifications.endpoints.gcp-dsw-db-notifications-{{env}}.cloud.goog"
-
